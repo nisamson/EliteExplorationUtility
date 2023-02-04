@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <LangVersion>latestmajor</LangVersion>
+        <NeutralLanguage>en-US</NeutralLanguage>
+        <Configurations>Release;Debug</Configurations>
+        <Platforms>x64</Platforms>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+      <PlatformTarget>x64</PlatformTarget>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="EFCore.BulkExtensions.SQLite" Version="6.6.5" />
+      <PackageReference Include="EFCore.CheckConstraints" Version="7.0.2" />
+      <PackageReference Include="Microsoft.Data.Sqlite" Version="7.0.2" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore" Version="7.0.2" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="7.0.2">
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        <PrivateAssets>all</PrivateAssets>
+      </PackageReference>
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.2" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite.NetTopologySuite" Version="7.0.2" />
+      <PackageReference Include="mod_spatialite" Version="4.3.0.1" />
+      <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
+      <PackageReference Include="Nullable.Extensions" Version="4.1.0" />
+      <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.4" />
+      <PackageReference Include="System.Linq" Version="4.3.0" />
+    </ItemGroup>
+
+</Project>

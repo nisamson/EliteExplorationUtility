@@ -1,0 +1,1030 @@
+﻿{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id64": {
+      "type": "integer"
+    },
+    "name": {
+      "type": "string"
+    },
+    "coords": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "z": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "z"
+      ]
+    },
+    "allegiance": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "government": {
+      "type": "string"
+    },
+    "primaryEconomy": {
+      "type": "string"
+    },
+    "secondaryEconomy": {
+      "type": "string"
+    },
+    "security": {
+      "type": "string"
+    },
+    "population": {
+      "type": "integer"
+    },
+    "bodyCount": {
+      "type": "integer"
+    },
+    "date": {
+      "type": "string"
+    },
+    "bodies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id64": {
+            "type": "integer"
+          },
+          "bodyId": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "orbitalPeriod": {
+            "type": "number"
+          },
+          "semiMajorAxis": {
+            "type": "number"
+          },
+          "orbitalEccentricity": {
+            "type": "number"
+          },
+          "orbitalInclination": {
+            "type": "number"
+          },
+          "argOfPeriapsis": {
+            "type": "number"
+          },
+          "meanAnomaly": {
+            "type": "number"
+          },
+          "ascendingNode": {
+            "type": "number"
+          },
+          "stations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "integer"
+                },
+                "updateTime": {
+                  "type": "string"
+                },
+                "latitude": {
+                  "type": "number"
+                },
+                "longitude": {
+                  "type": "number"
+                },
+                "controllingFaction": {
+                  "type": "string"
+                },
+                "controllingFactionState": {
+                  "type": "null"
+                },
+                "distanceToArrival": {
+                  "type": "number"
+                },
+                "primaryEconomy": {
+                  "type": "string"
+                },
+                "allegiance": {
+                  "type": "string"
+                },
+                "government": {
+                  "type": "string"
+                },
+                "services": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "type": {
+                  "type": "string"
+                },
+                "landingPads": {
+                  "type": "object",
+                  "properties": {
+                    "large": {
+                      "type": "integer"
+                    },
+                    "medium": {
+                      "type": "integer"
+                    },
+                    "small": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "large",
+                    "medium",
+                    "small"
+                  ]
+                },
+                "market": {
+                  "type": "object",
+                  "properties": {
+                    "commodities": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "symbol": {
+                            "type": "string"
+                          },
+                          "category": {
+                            "type": "string"
+                          },
+                          "commodityId": {
+                            "type": "integer"
+                          },
+                          "demand": {
+                            "type": "integer"
+                          },
+                          "supply": {
+                            "type": "integer"
+                          },
+                          "buyPrice": {
+                            "type": "integer"
+                          },
+                          "sellPrice": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "buyPrice",
+                          "category",
+                          "commodityId",
+                          "demand",
+                          "name",
+                          "sellPrice",
+                          "supply",
+                          "symbol"
+                        ]
+                      }
+                    },
+                    "prohibitedCommodities": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "updateTime": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "commodities",
+                    "prohibitedCommodities",
+                    "updateTime"
+                  ]
+                },
+                "outfitting": {
+                  "type": "object",
+                  "properties": {
+                    "modules": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "symbol": {
+                            "type": "string"
+                          },
+                          "moduleId": {
+                            "type": "integer"
+                          },
+                          "class": {
+                            "type": "integer"
+                          },
+                          "rating": {
+                            "type": "string"
+                          },
+                          "category": {
+                            "type": "string"
+                          },
+                          "ship": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "category",
+                          "class",
+                          "moduleId",
+                          "name",
+                          "rating",
+                          "symbol"
+                        ]
+                      }
+                    },
+                    "updateTime": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "modules",
+                    "updateTime"
+                  ]
+                },
+                "shipyard": {
+                  "type": "object",
+                  "properties": {
+                    "ships": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "symbol": {
+                            "type": "string"
+                          },
+                          "shipId": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "shipId",
+                          "symbol"
+                        ]
+                      }
+                    },
+                    "updateTime": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ships",
+                    "updateTime"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "updateTime"
+              ]
+            }
+          },
+          "updateTime": {
+            "type": "string"
+          },
+          "subType": {
+            "type": "string"
+          },
+          "distanceToArrival": {
+            "type": "number"
+          },
+          "mainStar": {
+            "type": "boolean"
+          },
+          "age": {
+            "type": "integer"
+          },
+          "spectralClass": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "luminosity": {
+            "type": "string"
+          },
+          "absoluteMagnitude": {
+            "type": "number"
+          },
+          "solarMasses": {
+            "type": "number"
+          },
+          "solarRadius": {
+            "type": "number"
+          },
+          "surfaceTemperature": {
+            "type": "number"
+          },
+          "rotationalPeriod": {
+            "type": "number"
+          },
+          "rotationalPeriodTidallyLocked": {
+            "type": "boolean"
+          },
+          "axialTilt": {
+            "type": "number"
+          },
+          "parents": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "Null": {
+                  "type": "integer"
+                },
+                "Star": {
+                  "type": "integer"
+                },
+                "Planet": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "belts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "mass": {
+                  "type": "number"
+                },
+                "innerRadius": {
+                  "type": "number"
+                },
+                "outerRadius": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "innerRadius",
+                "mass",
+                "name",
+                "outerRadius",
+                "type"
+              ]
+            }
+          },
+          "isLandable": {
+            "type": "boolean"
+          },
+          "gravity": {
+            "type": "number"
+          },
+          "earthMasses": {
+            "type": "number"
+          },
+          "radius": {
+            "type": "number"
+          },
+          "surfacePressure": {
+            "type": "number"
+          },
+          "atmosphereType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "atmosphereComposition": {
+            "type": "object",
+            "properties": {
+              "Helium": {
+                "type": "number"
+              },
+              "Hydrogen": {
+                "type": "number"
+              },
+              "Carbon dioxide": {
+                "type": "number"
+              },
+              "Silicates": {
+                "type": "number"
+              },
+              "Sulphur dioxide": {
+                "type": "number"
+              },
+              "Nitrogen": {
+                "type": "number"
+              },
+              "Neon": {
+                "type": "number"
+              },
+              "Iron": {
+                "type": "number"
+              },
+              "Argon": {
+                "type": "number"
+              },
+              "Ammonia": {
+                "type": "number"
+              },
+              "Methane": {
+                "type": "number"
+              },
+              "Water": {
+                "type": "number"
+              },
+              "Oxygen": {
+                "type": "number"
+              }
+            }
+          },
+          "terraformingState": {
+            "type": "string"
+          },
+          "volcanismType": {
+            "type": "string"
+          },
+          "solidComposition": {
+            "type": "object",
+            "properties": {
+              "Ice": {
+                "type": "number"
+              },
+              "Metal": {
+                "type": "number"
+              },
+              "Rock": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "Ice",
+              "Metal",
+              "Rock"
+            ]
+          },
+          "materials": {
+            "type": "object",
+            "properties": {
+              "Antimony": {
+                "type": "number"
+              },
+              "Arsenic": {
+                "type": "number"
+              },
+              "Carbon": {
+                "type": "number"
+              },
+              "Iron": {
+                "type": "number"
+              },
+              "Nickel": {
+                "type": "number"
+              },
+              "Niobium": {
+                "type": "number"
+              },
+              "Phosphorus": {
+                "type": "number"
+              },
+              "Sulphur": {
+                "type": "number"
+              },
+              "Tin": {
+                "type": "number"
+              },
+              "Zinc": {
+                "type": "number"
+              },
+              "Zirconium": {
+                "type": "number"
+              },
+              "Cadmium": {
+                "type": "number"
+              },
+              "Manganese": {
+                "type": "number"
+              },
+              "Mercury": {
+                "type": "number"
+              },
+              "Tellurium": {
+                "type": "number"
+              },
+              "Vanadium": {
+                "type": "number"
+              },
+              "Chromium": {
+                "type": "number"
+              },
+              "Germanium": {
+                "type": "number"
+              },
+              "Molybdenum": {
+                "type": "number"
+              },
+              "Ruthenium": {
+                "type": "number"
+              },
+              "Yttrium": {
+                "type": "number"
+              },
+              "Selenium": {
+                "type": "number"
+              },
+              "Technetium": {
+                "type": "number"
+              },
+              "Tungsten": {
+                "type": "number"
+              },
+              "Polonium": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "Iron",
+              "Nickel"
+            ]
+          },
+          "signals": {
+            "type": "object",
+            "properties": {
+              "signals": {
+                "type": "object",
+                "properties": {
+                  "$SAA_SignalType_Human;": {
+                    "type": "integer"
+                  },
+                  "$SAA_SignalType_Biological;": {
+                    "type": "integer"
+                  },
+                  "$SAA_SignalType_Geological;": {
+                    "type": "integer"
+                  },
+                  "$SAA_SignalType_Other;": {
+                    "type": "integer"
+                  },
+                  "$SAA_SignalType_Thargoid;": {
+                    "type": "integer"
+                  },
+                  "$SAA_SignalType_Guardian;": {
+                    "type": "integer"
+                  },
+                  "Painite": {
+                    "type": "integer"
+                  },
+                  "Platinum": {
+                    "type": "integer"
+                  },
+                  "Rhodplumsite": {
+                    "type": "integer"
+                  },
+                  "Serendibite": {
+                    "type": "integer"
+                  },
+                  "Alexandrite": {
+                    "type": "integer"
+                  },
+                  "Benitoite": {
+                    "type": "integer"
+                  },
+                  "Monazite": {
+                    "type": "integer"
+                  },
+                  "Musgravite": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "updateTime": {
+                "type": "string"
+              },
+              "genuses": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "signals",
+              "updateTime"
+            ]
+          },
+          "reserveLevel": {
+            "type": "string"
+          },
+          "rings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "mass": {
+                  "type": "number"
+                },
+                "innerRadius": {
+                  "type": "number"
+                },
+                "outerRadius": {
+                  "type": "number"
+                },
+                "signals": {
+                  "type": "object",
+                  "properties": {
+                    "signals": {
+                      "type": "object",
+                      "properties": {
+                        "Serendibite": {
+                          "type": "integer"
+                        },
+                        "Benitoite": {
+                          "type": "integer"
+                        },
+                        "Monazite": {
+                          "type": "integer"
+                        },
+                        "Painite": {
+                          "type": "integer"
+                        },
+                        "Platinum": {
+                          "type": "integer"
+                        },
+                        "Rhodplumsite": {
+                          "type": "integer"
+                        },
+                        "Alexandrite": {
+                          "type": "integer"
+                        },
+                        "Musgravite": {
+                          "type": "integer"
+                        },
+                        "Bromellite": {
+                          "type": "integer"
+                        },
+                        "Grandidierite": {
+                          "type": "integer"
+                        },
+                        "Opal": {
+                          "type": "integer"
+                        },
+                        "Tritium": {
+                          "type": "integer"
+                        },
+                        "LowTemperatureDiamond": {
+                          "type": "integer"
+                        }
+                      }
+                    },
+                    "updateTime": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "signals",
+                    "updateTime"
+                  ]
+                }
+              },
+              "required": [
+                "innerRadius",
+                "mass",
+                "name",
+                "outerRadius",
+                "type"
+              ]
+            }
+          }
+        },
+        "required": [
+          "bodyId",
+          "id64",
+          "name",
+          "stations",
+          "type",
+          "updateTime"
+        ]
+      }
+    },
+    "stations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "updateTime": {
+            "type": "string"
+          },
+          "controllingFaction": {
+            "type": "string"
+          },
+          "controllingFactionState": {
+            "type": "null"
+          },
+          "distanceToArrival": {
+            "type": "number"
+          },
+          "primaryEconomy": {
+            "type": "string"
+          },
+          "government": {
+            "type": "string"
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "type": {
+            "type": "string"
+          },
+          "landingPads": {
+            "type": "object",
+            "properties": {
+              "large": {
+                "type": "integer"
+              },
+              "medium": {
+                "type": "integer"
+              },
+              "small": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "large",
+              "medium",
+              "small"
+            ]
+          },
+          "market": {
+            "type": "object",
+            "properties": {
+              "commodities": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "symbol": {
+                      "type": "string"
+                    },
+                    "category": {
+                      "type": "string"
+                    },
+                    "commodityId": {
+                      "type": "integer"
+                    },
+                    "demand": {
+                      "type": "integer"
+                    },
+                    "supply": {
+                      "type": "integer"
+                    },
+                    "buyPrice": {
+                      "type": "integer"
+                    },
+                    "sellPrice": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "buyPrice",
+                    "category",
+                    "commodityId",
+                    "demand",
+                    "name",
+                    "sellPrice",
+                    "supply",
+                    "symbol"
+                  ]
+                }
+              },
+              "prohibitedCommodities": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "updateTime": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "commodities",
+              "prohibitedCommodities",
+              "updateTime"
+            ]
+          },
+          "shipyard": {
+            "type": "object",
+            "properties": {
+              "ships": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "symbol": {
+                      "type": "string"
+                    },
+                    "shipId": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "shipId",
+                    "symbol"
+                  ]
+                }
+              },
+              "updateTime": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "ships",
+              "updateTime"
+            ]
+          },
+          "outfitting": {
+            "type": "object",
+            "properties": {
+              "modules": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "symbol": {
+                      "type": "string"
+                    },
+                    "moduleId": {
+                      "type": "integer"
+                    },
+                    "class": {
+                      "type": "integer"
+                    },
+                    "rating": {
+                      "type": "string"
+                    },
+                    "category": {
+                      "type": "string"
+                    },
+                    "ship": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "class",
+                    "moduleId",
+                    "name",
+                    "rating",
+                    "symbol"
+                  ]
+                }
+              },
+              "updateTime": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "modules",
+              "updateTime"
+            ]
+          },
+          "allegiance": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "controllingFaction",
+          "controllingFactionState",
+          "distanceToArrival",
+          "government",
+          "id",
+          "name",
+          "primaryEconomy",
+          "services",
+          "type",
+          "updateTime"
+        ]
+      }
+    },
+    "controllingFaction": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "government": {
+          "type": "string"
+        },
+        "allegiance": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "allegiance",
+        "government",
+        "name"
+      ]
+    },
+    "factions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "allegiance": {
+            "type": "string"
+          },
+          "government": {
+            "type": "string"
+          },
+          "influence": {
+            "type": "number"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "allegiance",
+          "government",
+          "influence",
+          "name",
+          "state"
+        ]
+      }
+    },
+    "powers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "powerState": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "bodies",
+    "coords",
+    "date",
+    "id64",
+    "name",
+    "stations"
+  ]
+}
