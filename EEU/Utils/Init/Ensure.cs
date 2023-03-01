@@ -10,7 +10,9 @@ using Nullable.Extensions;
 namespace EEU.Utils.Init;
 
 public class Ensure {
+#pragma warning disable CS8632
     private static string? CheckLoadable(string package, string library) {
+    #pragma warning restore CS8632
         var runtimeLibrary = DependencyContext.Default?.RuntimeLibraries.FirstOrDefault(l => l.Name == package);
         if (runtimeLibrary == null)
             return null;

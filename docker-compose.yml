@@ -1,0 +1,14 @@
+﻿version: "3.2"
+services:
+  sql-server-db:
+    container_name: sql-server-db
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    ports:
+      - "8054:1433"
+    environment:
+      - ACCEPT_EULA=Y
+    volumes:
+      - sqldata:/var/opt/mssql
+volumes:
+  sqldata:
+    external: true

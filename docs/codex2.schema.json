@@ -1,0 +1,130 @@
+﻿{
+  "$schema": "http://json-schema.org/schema#",
+  "type": "object",
+  "properties": {
+    "index_id": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "hud_category": {
+      "type": "string"
+    },
+    "english_name": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "reported_at": {
+      "type": "string"
+    },
+    "cmdrName": {
+      "type": "string"
+    },
+    "system": {
+      "type": "string"
+    },
+    "x": {
+      "type": "string"
+    },
+    "y": {
+      "type": "string"
+    },
+    "z": {
+      "type": "string"
+    },
+    "body": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "latitude": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "longitude": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "entryid": {
+      "type": "integer"
+    },
+    "name": {
+      "type": "string"
+    },
+    "name_localised": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "category": {
+      "type": "string"
+    },
+    "category_localised": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "sub_category": {
+      "type": "string"
+    },
+    "sub_category_localised": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "region_name": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "region_name_localised": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "id64": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "body",
+    "category",
+    "category_localised",
+    "cmdrName",
+    "created_at",
+    "english_name",
+    "entryid",
+    "hud_category",
+    "id64",
+    "index_id",
+    "latitude",
+    "longitude",
+    "name",
+    "name_localised",
+    "region_name",
+    "region_name_localised",
+    "reported_at",
+    "sub_category",
+    "sub_category_localised",
+    "system",
+    "x",
+    "y",
+    "z"
+  ]
+}
