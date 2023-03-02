@@ -1,18 +1,16 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.Immutable;
-using System.Runtime.Serialization;
 using EEU.Learn.Model;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using NeoSmart.AsyncLock;
 
 namespace EEU.Monitor;
 
-[DataContract]
-public record System : IEquatable<System> {
+public record System {
     public System(string name, string systemAddress) {
         Name = name;
         SystemAddress = systemAddress;
-        bodiesLock = new object();
     }
 
     public static System WithAddress(string systemAddress) {
@@ -20,46 +18,36 @@ public record System : IEquatable<System> {
     }
 
 
-    public System Merge(System other) {
+    public async Task<System> MergeAsync(System other) {
         var result = new System(Name == "Unknown" ? other.Name : Name, SystemAddress);
-        lock (BodiesLock) {
+        using (await bodiesLock.LockAsync()) {
             foreach (var (name, body) in Bodies) {
-                result.UpdateBody(name, body);
+                await result.UpdateBody(name, body);
             }
         }
 
-        lock (other.BodiesLock) {
+        using (await other.bodiesLock.LockAsync()) {
             foreach (var (name, body) in other.Bodies) {
-                result.UpdateBody(name, body);
+                await result.UpdateBody(name, body);
             }
         }
 
         return result;
     }
 
-    [DataMember] public string Name { get; set; }
-
-    [DataMember] public string SystemAddress { get; init; }
-
-    [JsonIgnore] [IgnoreDataMember] private object? bodiesLock;
-
-    [DataMember] private IDictionary<string, Body> bodies = new ConcurrentDictionary<string, Body>();
-
-    [JsonIgnore]
-    [IgnoreDataMember]
-    private object BodiesLock {
-        get {
-            if (bodiesLock == null) {
-                lock (this) {
-                    bodiesLock ??= new object();
-                }
-            }
-
-            return bodiesLock;
-        }
+    public System Merge(System other) {
+        return MergeAsync(other).Result;
     }
 
-    [IgnoreDataMember]
+    public string Name { get; set; }
+
+    public string SystemAddress { get; init; }
+
+    private IDictionary<string, Body> bodies = new ConcurrentDictionary<string, Body>();
+
+    [JsonIgnore] private readonly AsyncLock bodiesLock = new();
+
+
     public IDictionary<string, Body> Bodies {
         get => bodies;
         set => bodies = value.GetType() == typeof(ConcurrentDictionary<string, Body>)
@@ -67,26 +55,24 @@ public record System : IEquatable<System> {
             : new ConcurrentDictionary<string, Body>(value);
     }
 
-    [JsonIgnore] [IgnoreDataMember] public IReadOnlyDictionary<string, Body> BodyView => Bodies.AsReadOnly();
+    [JsonIgnore] public IReadOnlyDictionary<string, Body> BodyView => Bodies.AsReadOnly();
 
 
     [JsonIgnore]
-    [IgnoreDataMember]
     public ImmutableDictionary<string, BodyData.ValuePrediction> Predictions =>
         Bodies
             .Where(x => x.Value.Prediction != null)
             .ToImmutableDictionary(x => x.Key, x => x.Value.Prediction!);
 
     [JsonIgnore]
-    [IgnoreDataMember]
     public ImmutableDictionary<string, BodyData.ValuePrediction> RefinedPredictions =>
         Bodies
             .Where(x => x.Value.RefinedPrediction != null)
             .ToImmutableDictionary(x => x.Key, x => x.Value.RefinedPrediction!);
 
-    public IDictionary<string, Body> PredictionReadyBodies() {
+    public async Task<IDictionary<string, Body>> PredictionReadyBodies() {
         var result = new Dictionary<string, Body>();
-        lock (BodiesLock) {
+        using (await bodiesLock.LockAsync()) {
             foreach (var (name, body) in Bodies) {
                 if (body.Data.PredictionReady() && body.Prediction == null) {
                     result[name] = body;
@@ -97,9 +83,9 @@ public record System : IEquatable<System> {
         return result;
     }
 
-    public IDictionary<string, Body> RefinedPredictionReadyBodies() {
+    public async Task<IDictionary<string, Body>> RefinedPredictionReadyBodies() {
         var result = new Dictionary<string, Body>();
-        lock (BodiesLock) {
+        using (await bodiesLock.LockAsync()) {
             foreach (var (name, body) in Bodies) {
                 if (body.Data.RefinedPredictionReady() && body.RefinedPrediction == null) {
                     result[name] = body;
@@ -115,8 +101,8 @@ public record System : IEquatable<System> {
     /// </summary>
     /// <param name="name"></param>
     /// <returns>true if already encountered body</returns>
-    private bool EncounterBody(string name) {
-        lock (BodiesLock) {
+    private async Task<bool> EncounterBody(string name) {
+        using (await bodiesLock.LockAsync()) {
             if (Bodies.ContainsKey(name)) {
                 return true;
             }
@@ -133,45 +119,45 @@ public record System : IEquatable<System> {
     /// <param name="name"></param>
     /// <param name="body"></param>
     /// <returns>true if already encountered body</returns>
-    public bool UpdateBody(string name, BodyData body) {
-        lock (BodiesLock) {
-            var o = EncounterBody(name);
+    public async Task<bool> UpdateBody(string name, BodyData body) {
+        using (await bodiesLock.LockAsync()) {
+            var o = await EncounterBody(name);
             Bodies[name].Data = body;
             return o;
         }
     }
 
-    public bool UpdateBody(string name, Body body) {
-        lock (BodiesLock) {
-            var o = EncounterBody(name);
+    public async Task<bool> UpdateBody(string name, Body body) {
+        using (await bodiesLock.LockAsync()) {
+            var o = await EncounterBody(name);
             Bodies[name] = Bodies[name].Merge(body);
             return o;
         }
     }
 
-    public void RemoveBody(string name) {
-        lock (BodiesLock) {
+    public async Task RemoveBody(string name) {
+        using (await bodiesLock.LockAsync()) {
             Bodies.Remove(name, out _);
         }
     }
 
-    public void UpdatePrediction(string name, BodyData.ValuePrediction prediction) {
-        lock (BodiesLock) {
-            EncounterBody(name);
+    public async Task UpdatePrediction(string name, BodyData.ValuePrediction prediction) {
+        using (await bodiesLock.LockAsync()) {
+            await EncounterBody(name);
             Bodies[name].Prediction = prediction;
         }
     }
 
-    public void UpdateRefinedPrediction(string name, BodyData.ValuePrediction refinedPrediction) {
-        lock (BodiesLock) {
-            EncounterBody(name);
+    public async Task UpdateRefinedPrediction(string name, BodyData.ValuePrediction refinedPrediction) {
+        using (await bodiesLock.LockAsync()) {
+            await EncounterBody(name);
             Bodies[name].RefinedPrediction = refinedPrediction;
         }
     }
 
-    public void UpdateBodySignals(string name, int bioSignalCount) {
-        lock (BodiesLock) {
-            EncounterBody(name);
+    public async Task UpdateBodySignals(string name, int bioSignalCount) {
+        using (await bodiesLock.LockAsync()) {
+            await EncounterBody(name);
             Bodies[name].Data.Count = bioSignalCount;
         }
     }
@@ -185,39 +171,29 @@ public record System : IEquatable<System> {
             return true;
         }
 
-        return Equals(bodiesLock, other.bodiesLock) && bodies.Equals(other.bodies) && Name == other.Name &&
-               SystemAddress == other.SystemAddress;
+        using (bodiesLock.Lock()) {
+            return Bodies.Equals(other.Bodies) && Name == other.Name &&
+                   SystemAddress == other.SystemAddress;
+        }
     }
 
     public override int GetHashCode() {
-        lock (BodiesLock) {
+        using (bodiesLock.Lock()) {
             return HashCode.Combine(Bodies, Name, SystemAddress);
         }
     }
 }
 
-[DataContract]
-public record Body([property: DataMember] string Name) {
-    [DataMember] private BodyData data = new();
-    [DataMember] private BodyData.ValuePrediction? prediction;
-    [DataMember] private BodyData.ValuePrediction? refinedPrediction;
+public class Body {
+    public string Name { get; init; } = "Unknown";
+    private BodyData data = new();
+    public BodyData.ValuePrediction? Prediction { get; set; }
+    public BodyData.ValuePrediction? RefinedPrediction { get; set; }
 
-    [IgnoreDataMember]
+
     public BodyData Data {
         get => data;
         set => data = data.Merge(value);
-    }
-
-    [IgnoreDataMember]
-    public BodyData.ValuePrediction? Prediction {
-        get => prediction;
-        set => prediction = value;
-    }
-
-    [IgnoreDataMember]
-    public BodyData.ValuePrediction? RefinedPrediction {
-        get => refinedPrediction;
-        set => refinedPrediction = value;
     }
 
     public static Body Merge(Body a, Body b) {

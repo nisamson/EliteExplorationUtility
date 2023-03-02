@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.ML;
+using NeoSmart.AsyncLock;
 using Newtonsoft.Json;
 
 namespace EEU.Monitor;
@@ -17,7 +18,7 @@ public class PredictionService : BackgroundService {
     // ReSharper disable InconsistentlySynchronizedField
     private readonly ILogger log;
     private readonly MLContext mlContext = new();
-    private readonly object systemLock = new();
+    private readonly AsyncLock systemLock = new();
     private System currentSystem = new("Unknown", "0");
     private PredictionEngine<BodyData, BodyData.ValuePrediction>? withoutGeneraPredictionEngine;
     private DataViewSchema? schema;
@@ -25,8 +26,12 @@ public class PredictionService : BackgroundService {
     private readonly IConfiguration configuration;
     private readonly PredictionServiceOptions options;
     private FasterKVSettings<string, System>? kvSettings;
-    private object lastUpdateLock = new();
-    private DateTime lastUpdate = DateTime.MinValue;
+    private readonly AsyncRateLimiter statusRateLimiter = new(TimeSpan.FromSeconds(1));
+    private readonly AsyncRateLimiter checkpointRateLimiter = new(TimeSpan.FromSeconds(5));
+    private readonly CancellationTokenSource cancellationTokenSource = new();
+    private Task? checkpointTask;
+    private readonly AsyncRateLimiter compactionRateLimiter = new(TimeSpan.FromMinutes(1));
+    private readonly AsyncLock checkpointLock = new();
 
     private FasterKVSettings<string, System> KvSettings {
         get => kvSettings ?? throw new InvalidOperationException("FasterKV settings not initialized");
@@ -65,33 +70,35 @@ public class PredictionService : BackgroundService {
         api.Events.On<SaaSignalsFoundEvent>(HandleSaaSignals);
         api.Events.On<StatusEvent>(HandleStatus);
         api.Events.On<LocationEvent>(HandleLocation);
+        api.Events.On<FsdJumpEvent>(HandleFsdJump);
         this.api = api;
         this.configuration = configuration;
         options = configuration.GetSection(PredictionServiceOptions.Position).Get<PredictionServiceOptions>() ??
                   new PredictionServiceOptions();
     }
 
-    private void HandleLocation(LocationEvent @event, EventContext context) {
-        lock (systemLock) {
+    private async Task HandleFsdJump(FsdJumpEvent @event) {
+        log.LogInformation("Jumping to {SystemName} ({SystemAddress})", @event.StarSystem, @event.SystemAddress);
+        await EncounterSystem(@event.SystemAddress, @event.StarSystem);
+    }
+
+    private async Task HandleLocation(LocationEvent @event, EventContext context) {
+        using (await systemLock.LockAsync()) {
             if (currentSystem.SystemAddress == @event.SystemAddress) {
                 return;
             }
 
             log.LogInformation("Switching to system {SystemName} ({SystemAddress})", @event.StarSystem, @event.SystemAddress);
-            EncounterSystem(@event.SystemAddress, @event.StarSystem);
+            await EncounterSystem(@event.SystemAddress, @event.StarSystem);
         }
     }
 
-    private void HandleStatus(StatusEvent @event) {
-        lock (lastUpdateLock) {
-            if (lastUpdate.AddSeconds(1) > DateTime.UtcNow) {
-                return;
-            }
-
-            lastUpdate = DateTime.UtcNow;
+    private async Task HandleStatus(StatusEvent @event) {
+        if ((await statusRateLimiter.TryTakeAsync()).RateLimited()) {
+            return;
         }
 
-        UpdatePredictions();
+        await UpdatePredictions();
         log.LogInformation(
             "Current system: {SystemName} ({SystemAddress}) with {BodyCount} scanned bodies",
             currentSystem.Name,
@@ -108,9 +115,9 @@ public class PredictionService : BackgroundService {
         log.LogInformation("Current refined predictions: {Predictions}", JsonConvert.SerializeObject(currentSystem.RefinedPredictions));
     }
 
-    private void HandleSaaSignals(SaaSignalsFoundEvent @event) {
+    private async Task HandleSaaSignals(SaaSignalsFoundEvent @event) {
         log.LogDebug("Received SAA signals for {BodyName}", @event.BodyName);
-        EncounterBodyDataInSystem(
+        await EncounterBodyDataInSystem(
             @event.SystemAddress,
             @event.BodyName,
             new BodyData {
@@ -120,9 +127,9 @@ public class PredictionService : BackgroundService {
         );
     }
 
-    private void HandleBodySignals(FssBodySignalsEvent @event) {
+    private async Task HandleBodySignals(FssBodySignalsEvent @event) {
         log.LogDebug("Received FSS body signals for {BodyName}", @event.BodyName);
-        EncounterBodyDataInSystem(
+        await EncounterBodyDataInSystem(
             @event.SystemAddress,
             @event.BodyName,
             new BodyData { Count = @event.Signals.Where(s => s.IsBiological).Select(s => s.Count).Sum() }
@@ -159,8 +166,56 @@ public class PredictionService : BackgroundService {
         log.LogDebug("Prediction engine initialized");
         await InitDb();
         await api.InitialiseAsync();
+        if (options.PrimeCache) {
+            await PrimeCache(cancellationToken);
+        }
+
         await api.StartAsync();
         await base.StartAsync(cancellationToken);
+    }
+
+    private async Task PrimeCache(CancellationToken cancellationToken) {
+        log.LogDebug("priming cache");
+        using var scope = log.BeginScope("PrimeCache");
+        var journalDir = api.Config.JournalsPath;
+        if (journalDir == null) {
+            log.LogCritical("Journal directory not configured");
+            throw new InvalidOperationException("Journal directory not configured");
+        }
+
+        // ReSharper disable once MethodSupportsCancellation
+        var journalFiles = await Task.Run(() => Directory.GetFiles(journalDir, api.Config.JournalPattern));
+        journalFiles = journalFiles.OrderBy(File.GetLastWriteTimeUtc)
+            .SkipLast(1)
+            .Where(x => File.GetLastWriteTimeUtc(x) > options.PrimeEpoch)
+            .ToArray();
+        foreach (var journalFile in journalFiles) {
+            if (cancellationToken.IsCancellationRequested) {
+                log.LogDebug("Cancellation requested, stopping prime");
+                break;
+            }
+
+            log.LogDebug("Processing journal file {JournalFile}", journalFile);
+
+            await ProcessJournalAsync(journalFile, cancellationToken);
+        }
+
+        // ReSharper disable once MethodSupportsCancellation
+        using var _ = await checkpointLock.LockAsync();
+        await KvStore.TakeFullCheckpointAsync(CheckpointType.Snapshot);
+    }
+
+    private async Task ProcessJournalAsync(string journalFile, CancellationToken? cancellationToken = null) {
+        await using var stream = File.OpenRead(journalFile);
+        var reader = new StreamReader(stream);
+        var linesReader = new AsyncLinesReader(reader);
+        var context = new EventContext {
+            IsRaisedDuringCatchup = true,
+            SourceFile = journalFile,
+        };
+        await foreach (var line in linesReader.WithCancellation(cancellationToken ?? cancellationTokenSource.Token)) {
+            api.Events.Invoke(line, context);
+        }
     }
 
     private async Task InitDb() {
@@ -175,68 +230,94 @@ public class PredictionService : BackgroundService {
             await Task.Run(() => Directory.CreateDirectory(dbLoc));
         }
 
-        kvSettings = new FasterKVSettings<string, System>(dbLoc, logger: log) {
+        KvSettings = new FasterKVSettings<string, System>(dbLoc) {
             TryRecoverLatest = true,
             RemoveOutdatedCheckpoints = true,
             ValueSerializer = () => new SystemSerializer(),
         };
-        kvStore = new FasterKV<string, System>(kvSettings);
+        KvStore = new FasterKV<string, System>(kvSettings);
+        checkpointTask = Checkpoint();
+    }
+
+    private async Task Checkpoint() {
+        log.LogTrace("Taking checkpoint");
+        while (cancellationTokenSource.IsCancellationRequested == false) {
+            await checkpointRateLimiter.WaitAsync(cancellationTokenSource.Token);
+            if (cancellationTokenSource.IsCancellationRequested) {
+                break;
+            }
+
+            using var _ = await checkpointLock.LockAsync();
+            if ((await compactionRateLimiter.TryTakeAsync()).ShouldContinue()) {
+                log.LogTrace("Compacting database");
+                KvStore.For(PredictionServiceFunctions.Instance).NewSession<PredictionServiceFunctions>()
+                    .Compact(KvStore.Log.SafeReadOnlyAddress, CompactionType.Scan);
+                log.LogTrace("Compaction complete");
+                await KvStore.TakeFullCheckpointAsync(CheckpointType.FoldOver);
+            } else {
+                await KvStore.TakeHybridLogCheckpointAsync(CheckpointType.Snapshot, true);
+            }
+
+            log.LogTrace("Checkpoint complete");
+        }
     }
 
     public override async Task StopAsync(CancellationToken cancellationToken) {
+        cancellationTokenSource.Cancel();
         await api.StopAsync();
+        await (checkpointTask ?? Task.CompletedTask);
         await base.StopAsync(cancellationToken);
     }
 
-    private void EncounterBody(ScanEvent body) {
+    private async Task EncounterBody(ScanEvent body) {
         log.LogInformation("Received scan event for {BodyName}", body.BodyName);
 
-        EncounterSystem(body.SystemAddress, body.StarSystem);
+        await EncounterSystem(body.SystemAddress, body.StarSystem);
         if (!body.IsDetailedPlanet()) {
-            log.LogDebug("Skipping scan of {BodyName} as it is not a detailed scan", body.BodyName);
+            log.LogDebug("Skipping scan of {BodyName} as it is not a detailed scan of a planet", body.BodyName);
             return;
         }
 
 
-        EncounterBodyDataInSystem(body.SystemAddress, body.BodyName, body.ToBodyData()!);
+        await EncounterBodyDataInSystem(body.SystemAddress, body.BodyName, body.ToBodyData()!);
     }
 
-    private void EncounterBodyDataInSystem(string systemAddress, string bodyName, BodyData data) {
-        lock (systemLock) {
-            EncounterSystem(systemAddress);
-            if (!currentSystem.UpdateBody(bodyName, data)) {
+    private async Task EncounterBodyDataInSystem(string systemAddress, string bodyName, BodyData data) {
+        using (await systemLock.LockAsync()) {
+            await EncounterSystem(systemAddress);
+            if (!await currentSystem.UpdateBody(bodyName, data)) {
                 UpsertSystem(currentSystem).Wait();
             }
 
-            UpdatePredictions();
+            await UpdatePredictions();
         }
     }
 
-    private void UpdatePredictions() {
-        lock (systemLock) {
+    private async Task UpdatePredictions() {
+        using (await systemLock.LockAsync()) {
             var changed = false;
-            foreach (var (name, d) in currentSystem.PredictionReadyBodies()) {
+            foreach (var (name, d) in await currentSystem.PredictionReadyBodies()) {
                 var prediction = WithoutGeneraPredictionEngine.Predict(d.Data);
-                currentSystem.UpdatePrediction(name, prediction);
+                await currentSystem.UpdatePrediction(name, prediction);
                 log.LogInformation("Predicted value for {BodyName} is {Value}", name, prediction.Score);
                 changed = true;
             }
 
-            foreach (var (name, d) in currentSystem.RefinedPredictionReadyBodies()) {
+            foreach (var (name, d) in await currentSystem.RefinedPredictionReadyBodies()) {
                 var prediction = WithGeneraPredictionEngine.Predict(d.Data);
-                currentSystem.UpdateRefinedPrediction(name, prediction);
+                await currentSystem.UpdateRefinedPrediction(name, prediction);
                 log.LogInformation("Refined predicted value for {BodyName} is {Value}", name, prediction.Score);
                 changed = true;
             }
 
             if (changed) {
-                UpsertSystem(currentSystem).Wait();
+                await UpsertSystem(currentSystem);
             }
         }
     }
 
-    private void EncounterSystem(string address, string name = "Unknown") {
-        lock (systemLock) {
+    private async Task EncounterSystem(string address, string name = "Unknown") {
+        using (await systemLock.LockAsync()) {
             if (currentSystem.SystemAddress == address) {
                 if (currentSystem.Name == "Unknown" && currentSystem.Name != name) {
                     currentSystem.Name = name;
@@ -245,7 +326,7 @@ public class PredictionService : BackgroundService {
                 return;
             }
 
-            var sys = RetrieveSystem(address).Result;
+            var sys = await RetrieveSystem(address, name);
             log.LogInformation("Encountered system {SystemName} ({SystemAddress})", sys.Name, sys.SystemAddress);
             currentSystem = sys;
         }
@@ -265,42 +346,29 @@ public class PredictionService : BackgroundService {
         using var session = KvStore.For(PredictionServiceFunctions.Instance)
             .NewSession<PredictionServiceFunctions>();
 
-        var r = await session.UpsertAsync(system.SystemAddress, system);
+        var r = await session.RMWAsync(system.SystemAddress, system);
         while (r.Status.IsPending) {
             r = await r.CompleteAsync();
         }
 
         var o = r.Output;
-        await KvStore.TakeHybridLogCheckpointAsync(CheckpointType.Snapshot, true);
+        await TakeHybridCheckpoint();
 
         return o;
     }
 
-    private void HandleBodyScan(ScanEvent scanEvent, EventContext context) {
-        EncounterBody(scanEvent);
-    }
-}
+    private async Task TakeHybridCheckpoint() {
+        using var _ = await checkpointLock.LockAsync();
+        if (await checkpointRateLimiter.TryTakeAsync() == AsyncRateLimiter.Result.RateLimited) {
+            log.LogTrace("Skipping checkpoint as rate limited");
+            return;
+        }
 
-public class PredictionServiceOptions {
-    public const string Position = "PredictionService";
-
-    public string DataStorePath { get; set; } = Path.Join(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        nameof(EEU),
-        nameof(Monitor),
-        "dataStore"
-    );
-
-    public bool PrimeCache { get; set; } = true;
-    public DateTime PrimeCacheFrom { get; set; } = DateTime.UtcNow.AddDays(-7);
-}
-
-public class PredictionServiceFunctions : SimpleFunctions<string, System> {
-    private static System Merge(System a, System b) {
-        return a.Merge(b);
+        log.LogDebug("Taking checkpoint");
+        await KvStore.TakeHybridLogCheckpointAsync(CheckpointType.Snapshot, true);
     }
 
-    private PredictionServiceFunctions() : base(Merge) { }
-
-    public static PredictionServiceFunctions Instance { get; } = new();
+    private async Task HandleBodyScan(ScanEvent scanEvent) {
+        await EncounterBody(scanEvent);
+    }
 }

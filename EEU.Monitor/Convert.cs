@@ -23,6 +23,16 @@ public static class Convert {
         return other != 0 ? other : others.FirstOrDefault(o => o != 0);
     }
 
+    [return: NotNullIfNotNull(nameof(value))]
+    [return: NotNullIfNotNull(nameof(other))]
+    public static string? Or(this string? value, string? other, params string?[] others) {
+        if (!string.IsNullOrEmpty(value)) {
+            return value;
+        }
+
+        return !string.IsNullOrEmpty(other) ? other : others.FirstOrDefault(o => !string.IsNullOrEmpty(o));
+    }
+
     public static bool IsPlanetary(this ScanEvent scan) {
         return !string.IsNullOrEmpty(scan.PlanetClass);
     }
@@ -74,60 +84,27 @@ public static class Convert {
     }
 
     public static BodyData Merge(this BodyData body, BodyData other) {
-        return new BodyData {
-            Ammonia = body.Ammonia.Or(other.Ammonia),
-            Argon = body.Argon.Or(other.Argon),
-            Antimony = body.Antimony.Or(body.Antimony),
-            Arsenic = body.Arsenic.Or(other.Arsenic),
-            AtmosIron = body.AtmosIron.Or(other.AtmosIron),
-            AxialTilt = body.AxialTilt.Or(other.AxialTilt),
-            Cadmium = body.Cadmium.Or(other.Cadmium),
-            Carbon = body.Carbon.Or(other.Carbon),
-            CarbonDioxide = body.CarbonDioxide.Or(other.CarbonDioxide),
-            Chromium = body.Chromium.Or(other.Chromium),
-            Count = body.Count.Or(other.Count),
-            DistanceToArrival = body.DistanceToArrival.Or(other.DistanceToArrival),
-            Gravity = body.Gravity.Or(other.Gravity),
-            Hydrogen = body.Hydrogen.Or(other.Hydrogen),
-            Ice = body.Ice.Or(other.Ice),
-            Germanium = body.Germanium.Or(other.Germanium),
-            Helium = body.Helium.Or(other.Helium),
-            Metal = body.Metal.Or(other.Metal),
-            Mercury = body.Mercury.Or(other.Mercury),
-            Manganese = body.Manganese.Or(other.Manganese),
-            Molybdenum = body.Molybdenum.Or(other.Molybdenum),
-            Nitrogen = body.Nitrogen.Or(other.Nitrogen),
-            Nickel = body.Nickel.Or(other.Nickel),
-            Oxygen = body.Oxygen.Or(other.Oxygen),
-            Phosphorus = body.Phosphorus.Or(other.Phosphorus),
-            Methane = body.Phosphorus.Or(other.Methane),
-            Neon = body.Neon.Or(other.Neon),
-            Niobium = body.Niobium.Or(other.Niobium),
-            Rock = body.Rock.Or(other.Rock),
-            Polonium = body.Polonium.Or(other.Polonium),
-            Tellurium = body.Tellurium.Or(other.Tellurium),
-            Vanadium = body.Vanadium.Or(other.Vanadium),
-            Yttrium = body.Yttrium.Or(other.Yttrium),
-            OrbitalEccentricity = body.OrbitalEccentricity.Or(other.OrbitalEccentricity),
-            OrbitalInclination = body.OrbitalInclination.Or(other.OrbitalInclination),
-            Genera = string.IsNullOrEmpty(body.Genera) ? other.Genera : body.Genera,
-            SurfacePressure = body.SurfacePressure.Or(other.SurfacePressure),
-            SurfaceTemperature = body.SurfaceTemperature.Or(other.SurfaceTemperature),
-            SubType = string.IsNullOrEmpty(body.SubType) ? other.SubType : body.SubType,
-            Ruthenium = body.Ruthenium.Or(other.Ruthenium),
-            Selenium = body.Selenium.Or(other.Selenium),
-            Silicates = body.Silicates.Or(other.Silicates),
-            Sulphur = body.Sulphur.Or(other.Sulphur),
-            Technetium = body.Technetium.Or(other.Technetium),
-            Tin = body.Tin.Or(other.Tin),
-            Tungsten = body.Tungsten.Or(other.Tungsten),
-            Value = body.Value.Or(other.Value),
-            Water = body.Water.Or(other.Water),
-            Zinc = body.Zinc.Or(other.Water),
-            Zirconium = body.Zirconium.Or(other.Zirconium),
-            MatsIron = body.MatsIron.Or(other.MatsIron),
-            SulphurDioxide = body.SulphurDioxide.Or(other.SulphurDioxide),
-        };
+        var result = new BodyData();
+        foreach (var prop in typeof(BodyData).GetProperties()) {
+            var curVal = prop.GetValue(body);
+            var candidateVal = prop.GetValue(other);
+            switch (curVal) {
+                case null when candidateVal != null:
+                    prop.SetValue(result, candidateVal);
+                    break;
+                case double curD when candidateVal is double candD:
+                    prop.SetValue(result, curD.Or(candD));
+                    break;
+                case long curL when candidateVal is long candL:
+                    prop.SetValue(result, curL.Or(candL));
+                    break;
+                case string curS when candidateVal is string candS:
+                    prop.SetValue(result, curS.Or(candS));
+                    break;
+            }
+        }
+
+        return result;
     }
 
     public static void SetProperty(this BodyData body, string name, double value, bool atmospheric = false) {
@@ -147,7 +124,6 @@ public static class Convert {
             default: {
                 var prop = typeof(BodyData).GetProperty(name);
                 if (prop != null) {
-                    Log.Logger.Verbose("Success matching property");
                     prop.SetValue(body, value);
                 }
 

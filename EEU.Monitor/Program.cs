@@ -1,8 +1,10 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
 using EliteAPI.Abstractions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Configuration.Json;
 using Serilog;
 
 namespace EEU.Monitor;
