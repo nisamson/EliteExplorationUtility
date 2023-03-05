@@ -4,7 +4,7 @@ using EEU.Learn.Model;
 using EliteAPI.Events;
 using Serilog;
 
-namespace EEU.Monitor;
+namespace EEU.Monitor.Util;
 
 public static class Convert {
     public static double Or(this double value, double other, params double[] others) {

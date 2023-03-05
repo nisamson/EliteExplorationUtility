@@ -1,6 +1,6 @@
 ﻿using NeoSmart.AsyncLock;
 
-namespace EEU.Monitor;
+namespace EEU.Monitor.Util;
 
 public class AsyncRateLimiter {
     public enum Result {
@@ -20,8 +20,8 @@ public class AsyncRateLimiter {
     /// Tries to take a value from the rate limiter.
     /// </summary>
     /// <returns>Success if the value was taken, or RateLimited if the rate limiter is not ready to take another value.</returns>
-    public async Task<Result> TryTakeAsync() {
-        using (await updateLock.LockAsync()) {
+    public async Task<Result> TryTakeAsync(CancellationToken cancellationToken = default) {
+        using (await updateLock.LockAsync(cancellationToken)) {
             if (DateTime.Now - lastUpdate < updatePeriod) {
                 return Result.RateLimited;
             }
@@ -37,12 +37,12 @@ public class AsyncRateLimiter {
     public async Task WaitAsync(CancellationToken cancellationToken = default) {
         var curMultiplier = 1;
         try {
-            while (!cancellationToken.IsCancellationRequested && await TryTakeAsync() == Result.RateLimited) {
+            while (!cancellationToken.IsCancellationRequested && await TryTakeAsync(cancellationToken) == Result.RateLimited) {
                 await Task.Delay(updatePeriod * curMultiplier, cancellationToken);
                 curMultiplier *= 2;
             }
         } catch (TaskCanceledException) {
-            return; // Ignore because we were waiting anyways
+            // Ignore because we were waiting anyways
         }
     }
 }

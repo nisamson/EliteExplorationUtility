@@ -1,9 +1,9 @@
 ﻿using FASTER.core;
 
-namespace EEU.Monitor;
+namespace EEU.Monitor.Prediction;
 
-public class PredictionServiceFunctions : SimpleFunctions<string, System> {
-    private static System Merge(System a, System b) {
+public class PredictionServiceFunctions : SimpleFunctions<string, Elite.System> {
+    private static Elite.System Merge(Elite.System a, Elite.System b) {
         return a.Merge(b);
     }
 

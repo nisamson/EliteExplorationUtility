@@ -1,4 +1,4 @@
-﻿namespace EEU.Monitor;
+﻿namespace EEU.Monitor.Util;
 
 public class AsyncLinesReader : IAsyncEnumerable<string>, IDisposable {
     private readonly TextReader reader;

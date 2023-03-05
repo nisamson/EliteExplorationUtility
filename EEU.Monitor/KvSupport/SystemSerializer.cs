@@ -5,9 +5,9 @@ using FASTER.core;
 using Microsoft.Extensions.Logging;
 using InvalidOperationException = System.InvalidOperationException;
 
-namespace EEU.Monitor;
+namespace EEU.Monitor.KvSupport;
 
-internal class SystemSerializer : BinaryObjectSerializer<System> {
+public class SystemSerializer : BinaryObjectSerializer<Elite.System> {
     private readonly ILogger? log;
 
     private static readonly JsonSerializerOptions JsonSerializerOptions = new() {
@@ -19,16 +19,16 @@ internal class SystemSerializer : BinaryObjectSerializer<System> {
         this.log = log;
     }
 
-    public override void Deserialize(out System obj) {
+    public override void Deserialize(out Elite.System obj) {
         var length = reader.ReadInt32();
         var bytes = reader.ReadBytes(length);
         var json = Encoding.UTF8.GetString(bytes);
         log?.LogTrace("Deserializing System: {json}", json);
-        obj = JsonSerializer.Deserialize<System>(json, JsonSerializerOptions) ??
+        obj = JsonSerializer.Deserialize<Elite.System>(json, JsonSerializerOptions) ??
               throw new InvalidOperationException("Failed to deserialize System");
     }
 
-    public override void Serialize(ref System obj) {
+    public override void Serialize(ref Elite.System obj) {
         var json = JsonSerializer.Serialize(obj, JsonSerializerOptions);
         log?.LogTrace("Serializing System: {json}", json);
         var bytes = Encoding.UTF8.GetBytes(json);

@@ -1,7 +1,7 @@
 ﻿using EliteAPI.Abstractions.Events;
 using Newtonsoft.Json;
 
-namespace EEU.Monitor;
+namespace EEU.Monitor.Elite;
 
 // { "timestamp":"2023-02-20T05:11:07Z", "event":"FSSBodySignals", "BodyName":"Eol Prou SX-W b17-57 B 3", "BodyID":28, "SystemAddress":125887770477721, "Signals":[ { "Type":"$SAA_SignalType_Biological;", "Type_Localised":"Biological", "Count":1 } ] }
 
