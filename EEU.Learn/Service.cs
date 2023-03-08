@@ -1,4 +1,19 @@
-﻿using System.Collections.Concurrent;
+﻿// EliteExplorationUtility - EEU.Learn - Service.cs
+// Copyright (C) 2023 Nick Samson
+// 
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+// 
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+// 
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 using System.Threading.Tasks.Dataflow;
 using EEU.Learn.Model;
 using Microsoft.ML;
@@ -8,30 +23,14 @@ namespace EEU.Learn;
 public sealed class Service {
     public delegate void HandlePrediction(Prediction prediction);
 
-    public sealed class Job {
-        public Job(string bodyName, BodyData data, HandlePrediction handlePrediction) {
-            BodyName = bodyName;
-            Data = data;
-            HandlePrediction = handlePrediction;
-        }
-
-        public string BodyName { get; }
-        public BodyData Data { get; }
-        public HandlePrediction HandlePrediction { get; }
-    }
-
-    public sealed class Prediction {
-        public string BodyName { get; init; }
-        public float ValuePrediction { get; init; }
-    }
-
-    private readonly MLContext mlContext;
-    private DataViewSchema schema;
-    private ITransformer model;
-    private PredictionEngine<BodyData, BodyData.ValuePrediction> predictionEngine;
     private readonly CancellationTokenSource cancellationTokenSource = new();
     private readonly BufferBlock<Job> jobs = new();
+
+    private readonly MLContext mlContext;
+    private ITransformer model;
+    private PredictionEngine<BodyData, BodyData.ValuePrediction> predictionEngine;
     private Task queueTask;
+    private DataViewSchema schema;
 
     private Service() {
         mlContext = new MLContext();
@@ -87,5 +86,22 @@ public sealed class Service {
         lock (this) {
             cancellationTokenSource.Dispose();
         }
+    }
+
+    public sealed class Job {
+        public Job(string bodyName, BodyData data, HandlePrediction handlePrediction) {
+            BodyName = bodyName;
+            Data = data;
+            HandlePrediction = handlePrediction;
+        }
+
+        public string BodyName { get; }
+        public BodyData Data { get; }
+        public HandlePrediction HandlePrediction { get; }
+    }
+
+    public sealed class Prediction {
+        public string BodyName { get; init; }
+        public float ValuePrediction { get; init; }
     }
 }

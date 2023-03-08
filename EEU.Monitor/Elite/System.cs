@@ -1,20 +1,79 @@
-﻿using System.Collections.Concurrent;
+﻿// EliteExplorationUtility - EEU.Monitor - System.cs
+// Copyright (C) 2023 Nick Samson
+// 
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+// 
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+// 
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 using EEU.Learn.Model;
 using EEU.Monitor.Util;
 using LiteDB;
-using NeoSmart.AsyncLock;
 using Serilog;
 
 namespace EEU.Monitor.Elite;
 
 public class System {
+    [JsonIgnore] [BsonIgnore] private readonly object bodiesLock = new();
+
+    private IDictionary<string, Body> bodies = new ConcurrentDictionary<string, Body>();
+
+    [BsonField("Name")] private string? name;
+
     public System(string? name, string systemAddress) {
         this.name = name;
         SystemAddress = systemAddress;
     }
+
+    [MemberNotNullWhen(false, nameof(name))]
+    [JsonIgnore]
+    [BsonIgnore]
+    public bool NameIsUnknown => name is null;
+
+    [BsonIgnore]
+    public string Name {
+        get => name ?? "Unknown";
+        set => name = value;
+    }
+
+    [BsonId] public string SystemAddress { get; init; }
+
+
+    public IDictionary<string, Body> Bodies {
+        get => bodies;
+        set => bodies = value.GetType() == typeof(ConcurrentDictionary<string, Body>)
+            ? value
+            : new ConcurrentDictionary<string, Body>(value);
+    }
+
+    [JsonIgnore] [BsonIgnore] public IReadOnlyDictionary<string, Body> BodyView => Bodies.AsReadOnly();
+
+
+    [JsonIgnore]
+    [BsonIgnore]
+    public ImmutableDictionary<string, BodyData.ValuePrediction> Predictions =>
+        Bodies
+            .Where(x => x.Value.Prediction != null)
+            .ToImmutableDictionary(x => x.Key, x => x.Value.Prediction!);
+
+    [JsonIgnore]
+    [BsonIgnore]
+    public ImmutableDictionary<string, BodyData.ValuePrediction> RefinedPredictions =>
+        Bodies
+            .Where(x => x.Value.RefinedPrediction != null)
+            .ToImmutableDictionary(x => x.Key, x => x.Value.RefinedPrediction!);
 
     public static System WithAddress(string systemAddress) {
         return new System(null, systemAddress);
@@ -46,50 +105,6 @@ public class System {
         return result;
     }
 
-    [BsonField("Name")] private string? name;
-
-    [MemberNotNullWhen(false, nameof(name))]
-    [JsonIgnore]
-    [BsonIgnore]
-    public bool NameIsUnknown => name is null;
-
-    [BsonIgnore]
-    public string Name {
-        get => name ?? "Unknown";
-        set => name = value;
-    }
-
-    [BsonId] public string SystemAddress { get; init; }
-
-    private IDictionary<string, Body> bodies = new ConcurrentDictionary<string, Body>();
-
-    [JsonIgnore] [BsonIgnore] private readonly object bodiesLock = new();
-
-
-    public IDictionary<string, Body> Bodies {
-        get => bodies;
-        set => bodies = value.GetType() == typeof(ConcurrentDictionary<string, Body>)
-            ? value
-            : new ConcurrentDictionary<string, Body>(value);
-    }
-
-    [JsonIgnore] [BsonIgnore] public IReadOnlyDictionary<string, Body> BodyView => Bodies.AsReadOnly();
-
-
-    [JsonIgnore]
-    [BsonIgnore]
-    public ImmutableDictionary<string, BodyData.ValuePrediction> Predictions =>
-        Bodies
-            .Where(x => x.Value.Prediction != null)
-            .ToImmutableDictionary(x => x.Key, x => x.Value.Prediction!);
-
-    [JsonIgnore]
-    [BsonIgnore]
-    public ImmutableDictionary<string, BodyData.ValuePrediction> RefinedPredictions =>
-        Bodies
-            .Where(x => x.Value.RefinedPrediction != null)
-            .ToImmutableDictionary(x => x.Key, x => x.Value.RefinedPrediction!);
-
     public IDictionary<string, Body> PredictionReadyBodies() {
         var result = new Dictionary<string, Body>();
         lock (bodiesLock) {
@@ -117,7 +132,6 @@ public class System {
     }
 
     /// <summary>
-    /// 
     /// </summary>
     /// <param name="name"></param>
     /// <returns>true if already encountered body</returns>
@@ -134,7 +148,6 @@ public class System {
     }
 
     /// <summary>
-    /// 
     /// </summary>
     /// <param name="name"></param>
     /// <param name="body"></param>
@@ -193,13 +206,13 @@ public class System {
 }
 
 public class Body {
+    private BodyData data = new();
+
     public Body(string name) {
         Name = name;
     }
 
     public string Name { get; }
-
-    private BodyData data = new();
     public BodyData.ValuePrediction? Prediction { get; set; }
     public BodyData.ValuePrediction? RefinedPrediction { get; set; }
 

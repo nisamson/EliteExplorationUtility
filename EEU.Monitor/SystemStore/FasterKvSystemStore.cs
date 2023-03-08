@@ -1,4 +1,20 @@
-﻿using EEU.Monitor.KvSupport;
+﻿// EliteExplorationUtility - EEU.Monitor - FasterKvSystemStore.cs
+// Copyright (C) 2023 Nick Samson
+// 
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+// 
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+// 
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+using EEU.Monitor.KvSupport;
 using EEU.Monitor.Prediction;
 using EEU.Monitor.Util;
 using FASTER.core;
@@ -10,22 +26,15 @@ using NeoSmart.AsyncLock;
 namespace EEU.Monitor.SystemStore;
 
 public class FasterKvSystemStore : BackgroundService, ISystemStore {
-    public class Configuration : ISystemStore.Configuration {
-        public TimeSpan CheckpointRate { get; set; } = TimeSpan.FromSeconds(5);
-        public TimeSpan CompactionRate { get; set; } = TimeSpan.FromMinutes(1);
-    }
-
-    private readonly ILogger<FasterKvSystemStore> log;
-    private readonly AsyncRateLimiter compactionRateLimiter;
     private readonly AsyncLock checkpointLock = new();
     private readonly AsyncRateLimiter checkpointRateLimiter;
-    private readonly FasterKVSettings<string, Elite.System> kvSettings;
-    private FasterKV<string, Elite.System>? kvStore;
+    private readonly AsyncRateLimiter compactionRateLimiter;
 
-    private FasterKV<string, Elite.System> KvStore {
-        get => kvStore ?? throw new InvalidOperationException("FasterKV store not initialized");
-        set => kvStore = value;
-    }
+    private readonly Configuration config;
+    private readonly FasterKVSettings<string, Elite.System> kvSettings;
+
+    private readonly ILogger<FasterKvSystemStore> log;
+    private FasterKV<string, Elite.System>? kvStore;
 
     public FasterKvSystemStore(IConfiguration config, ILogger<FasterKvSystemStore> log) {
         this.log = log;
@@ -48,6 +57,39 @@ public class FasterKvSystemStore : BackgroundService, ISystemStore {
             RemoveOutdatedCheckpoints = true,
             ValueSerializer = () => new SystemSerializer(),
         };
+    }
+
+    private FasterKV<string, Elite.System> KvStore {
+        get => kvStore ?? throw new InvalidOperationException("FasterKV store not initialized");
+        set => kvStore = value;
+    }
+
+    public ISystemStore.Configuration Config => config;
+
+    public async Task<Elite.System> GetSystemAsync(string address,
+        string? systemName = null,
+        CancellationToken cancellationToken = default) {
+        using var session = KvStore.For(PredictionServiceFunctions.Instance)
+            .NewSession<PredictionServiceFunctions>();
+
+        var sys = new Elite.System(systemName, address);
+        var result = await session.ReadAsync(address, sys, token: CancellationToken.None);
+        var res = await Task.Run(() => result.Complete(), CancellationToken.None);
+        return res.output ?? sys;
+    }
+
+    public async Task<Elite.System> MergeSystemAsync(Elite.System system, CancellationToken cancellationToken = default) {
+        using var session = KvStore.For(PredictionServiceFunctions.Instance)
+            .NewSession<PredictionServiceFunctions>();
+
+        var r = await session.RMWAsync(system.SystemAddress, system, token: CancellationToken.None);
+        while (r.Status.IsPending) {
+            r = await r.CompleteAsync(CancellationToken.None);
+        }
+
+        var o = r.Output;
+
+        return o;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
@@ -78,35 +120,6 @@ public class FasterKvSystemStore : BackgroundService, ISystemStore {
         }
     }
 
-    private readonly Configuration config;
-    public ISystemStore.Configuration Config => config;
-
-    public async Task<Elite.System> GetSystemAsync(string address,
-        string? systemName = null,
-        CancellationToken cancellationToken = default) {
-        using var session = KvStore.For(PredictionServiceFunctions.Instance)
-            .NewSession<PredictionServiceFunctions>();
-
-        var sys = new Elite.System(systemName, address);
-        var result = await session.ReadAsync(address, sys, token: CancellationToken.None);
-        var res = await Task.Run(() => result.Complete(), CancellationToken.None);
-        return res.output ?? sys;
-    }
-
-    public async Task<Elite.System> MergeSystemAsync(Elite.System system, CancellationToken cancellationToken = default) {
-        using var session = KvStore.For(PredictionServiceFunctions.Instance)
-            .NewSession<PredictionServiceFunctions>();
-
-        var r = await session.RMWAsync(system.SystemAddress, system, token: CancellationToken.None);
-        while (r.Status.IsPending) {
-            r = await r.CompleteAsync(CancellationToken.None);
-        }
-
-        var o = r.Output;
-
-        return o;
-    }
-
     private async Task TakeHybridCheckpoint() {
         using var _ = await checkpointLock.LockAsync();
         if (await checkpointRateLimiter.TryTakeAsync() == AsyncRateLimiter.Result.RateLimited) {
@@ -122,5 +135,10 @@ public class FasterKvSystemStore : BackgroundService, ISystemStore {
         GC.SuppressFinalize(this);
         KvStore.Dispose();
         base.Dispose();
+    }
+
+    public class Configuration : ISystemStore.Configuration {
+        public TimeSpan CheckpointRate { get; set; } = TimeSpan.FromSeconds(5);
+        public TimeSpan CompactionRate { get; set; } = TimeSpan.FromMinutes(1);
     }
 }

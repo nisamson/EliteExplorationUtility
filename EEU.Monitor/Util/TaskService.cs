@@ -1,30 +1,36 @@
-﻿using System.Threading.Tasks.Dataflow;
+﻿// EliteExplorationUtility - EEU.Monitor - TaskService.cs
+// Copyright (C) 2023 Nick Samson
+// 
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+// 
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+// 
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+using System.Threading.Tasks.Dataflow;
 using Microsoft.Extensions.Logging;
 
 namespace EEU.Monitor.Util;
 
 public class TaskService<TState> : IDisposable where TState : class {
-    private readonly AsyncWaitGate startupGate;
-    private readonly AsyncWaitGate shutdownGate = new();
-    private readonly CancellationTokenSource cancellationTokenSource;
-    private readonly Thread thread;
+    public delegate TState StateInitializer();
+
     private readonly BufferBlock<Action<TState, ulong>> buffer = new();
-    private readonly ILogger? log;
+    private readonly CancellationTokenSource cancellationTokenSource;
     private readonly StateInitializer initializer;
+    private readonly ILogger? log;
+    private readonly AsyncWaitGate shutdownGate = new();
+    private readonly AsyncWaitGate startupGate;
+    private readonly Thread thread;
     private ulong eventsSeen;
     private TState? state;
-
-    private TState State {
-        get {
-            if (state == null) {
-                throw new InvalidOperationException("State not initialized");
-            }
-
-            return state;
-        }
-    }
-
-    public delegate TState StateInitializer();
 
 
     public TaskService(StateInitializer initializer,
@@ -36,6 +42,24 @@ public class TaskService<TState> : IDisposable where TState : class {
         this.initializer = initializer;
         thread = new Thread(EventLoop);
         thread.Start();
+    }
+
+    private TState State {
+        get {
+            if (state == null) {
+                throw new InvalidOperationException("State not initialized");
+            }
+
+            return state;
+        }
+    }
+
+    public void Dispose() {
+        GC.SuppressFinalize(this);
+        Shutdown();
+        if (state is IDisposable disposable) {
+            disposable.Dispose();
+        }
     }
 
     public Task WaitForStartupAsync(CancellationToken cancellationToken = default) {
@@ -106,13 +130,5 @@ public class TaskService<TState> : IDisposable where TState : class {
         buffer.Complete();
         cancellationTokenSource.Dispose();
         thread.Join();
-    }
-
-    public void Dispose() {
-        GC.SuppressFinalize(this);
-        Shutdown();
-        if (state is IDisposable disposable) {
-            disposable.Dispose();
-        }
     }
 }

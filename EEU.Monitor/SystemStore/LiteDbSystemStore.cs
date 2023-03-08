@@ -1,19 +1,40 @@
-﻿using System.Threading.Tasks.Dataflow;
+﻿// EliteExplorationUtility - EEU.Monitor - LiteDbSystemStore.cs
+// Copyright (C) 2023 Nick Samson
+// 
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+// 
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+// 
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+using System.Threading.Tasks.Dataflow;
 using EEU.Monitor.Util;
 using LiteDB;
-using LiteDB.Async;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Serilog;
-using System = EEU.Monitor.Elite.System;
 
 namespace EEU.Monitor.SystemStore;
 
 public class LiteDbSystemStore : BackgroundService, ISystemStore {
     private readonly ILogger<LiteDbSystemStore> log;
-    private readonly ISystemStore.Configuration config;
     private Executor? executor;
+
+
+    private AsyncWaitGate startupGate;
+
+    public LiteDbSystemStore(ILogger<LiteDbSystemStore> log, IConfiguration config) {
+        this.log = log;
+        this.Config = config.GetSection(ISystemStore.Configuration.Position).Get<ISystemStore.Configuration>() ??
+                      new ISystemStore.Configuration();
+    }
 
     private Executor DbExecutor {
         get {
@@ -25,104 +46,12 @@ public class LiteDbSystemStore : BackgroundService, ISystemStore {
         }
     }
 
-    private delegate void DbEvent(LiteDatabase db, ILiteCollection<Elite.System> systems, ulong eventId);
-
-
-    private AsyncWaitGate startupGate;
-
-    private class Executor : IDisposable {
-        private readonly LiteDatabase database;
-        private readonly ILiteCollection<Elite.System> systems;
-        private readonly ILogger<LiteDbSystemStore> log;
-        private readonly Thread thread;
-        private readonly BufferBlock<DbEvent> buffer = new();
-        private readonly CancellationToken cancellationToken;
-        private ulong eventsSeen;
-
-        public Executor(ISystemStore.Configuration config, ILogger<LiteDbSystemStore> log, CancellationToken cancellationToken) {
-            this.log = log;
-            Directory.CreateDirectory(config.DbPath);
-            var dbPath = Path.Join(config.DbPath, "systems.db");
-            database = new LiteDatabase(
-                new ConnectionString {
-                    Filename = dbPath,
-                    Upgrade = true,
-                    Connection = ConnectionType.Direct,
-                }
-            );
-            this.cancellationToken = cancellationToken;
-            systems = database.GetCollection<Elite.System>("systems");
-            thread = new Thread(HandleEvents);
-            thread.Start();
-        }
-
-        private void HandleEvents() {
-            log.LogTrace("Starting LiteDbSystemStore event handler");
-            foreach (var dbEvent in buffer.ReceiveAllAsync(cancellationToken).ToEnumerable()) {
-                var eventId = Interlocked.Increment(ref eventsSeen);
-                log.LogTrace("executing event {EventId}", eventId);
-                dbEvent(database, systems, eventId);
-            }
-        }
-
-        public async Task DoAsync(DbEvent dbEvent, CancellationToken cancellationToken = default) {
-            await DoAsync<object>(
-                (db, systems, eventId) => {
-                    dbEvent(db, systems, eventId);
-                    return null;
-                },
-                cancellationToken
-            );
-        }
-
-        public async Task<TResult> DoAsync<TResult>(Func<LiteDatabase, ILiteCollection<Elite.System>, ulong, TResult> dbEvent,
-            CancellationToken cancellationToken = default) {
-            var linked = CancellationTokenSource.CreateLinkedTokenSource(this.cancellationToken, cancellationToken);
-            var oneshot = new TaskCompletionSource<TResult>();
-
-            void Wrapped(LiteDatabase db, ILiteCollection<Elite.System> systems, ulong eventId) {
-                oneshot.SetResult(dbEvent(db, systems, eventId));
-            }
-
-            await buffer.SendAsync(Wrapped, linked.Token);
-            return await oneshot.Task;
-        }
-
-
-        public void Dispose() {
-            GC.SuppressFinalize(this);
-            buffer.Complete();
-            thread.Join();
-            database.Dispose();
-        }
-    }
-
-    public LiteDbSystemStore(ILogger<LiteDbSystemStore> log, IConfiguration config) {
-        this.log = log;
-        this.config = config.GetSection(ISystemStore.Configuration.Position).Get<ISystemStore.Configuration>() ??
-                      new ISystemStore.Configuration();
-    }
-
     public override async Task StartAsync(CancellationToken cancellationToken) {
         startupGate = new AsyncWaitGate(cancellationToken);
         await base.StartAsync(cancellationToken);
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
-        executor = new Executor(config, log, stoppingToken);
-        startupGate.Release();
-        var tc = new TaskCompletionSource();
-        stoppingToken.Register(() => tc.SetResult());
-        await tc.Task;
-    }
-
-    public override void Dispose() {
-        GC.SuppressFinalize(this);
-        executor?.Dispose();
-        base.Dispose();
-    }
-
-    public ISystemStore.Configuration Config => config;
+    public ISystemStore.Configuration Config { get; }
 
     public async Task<Elite.System> GetSystemAsync(string address,
         string? systemName = null,
@@ -176,5 +105,88 @@ public class LiteDbSystemStore : BackgroundService, ISystemStore {
             },
             cancellationToken
         );
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
+        executor = new Executor(Config, log, stoppingToken);
+        startupGate.Release();
+        var tc = new TaskCompletionSource();
+        stoppingToken.Register(() => tc.SetResult());
+        await tc.Task;
+    }
+
+    public override void Dispose() {
+        GC.SuppressFinalize(this);
+        executor?.Dispose();
+        base.Dispose();
+    }
+
+    private delegate void DbEvent(LiteDatabase db, ILiteCollection<Elite.System> systems, ulong eventId);
+
+    private class Executor : IDisposable {
+        private readonly BufferBlock<DbEvent> buffer = new();
+        private readonly CancellationToken cancellationToken;
+        private readonly LiteDatabase database;
+        private readonly ILogger<LiteDbSystemStore> log;
+        private readonly ILiteCollection<Elite.System> systems;
+        private readonly Thread thread;
+        private ulong eventsSeen;
+
+        public Executor(ISystemStore.Configuration config, ILogger<LiteDbSystemStore> log, CancellationToken cancellationToken) {
+            this.log = log;
+            Directory.CreateDirectory(config.DbPath);
+            var dbPath = Path.Join(config.DbPath, "systems.db");
+            database = new LiteDatabase(
+                new ConnectionString {
+                    Filename = dbPath,
+                    Upgrade = true,
+                    Connection = ConnectionType.Direct,
+                }
+            );
+            this.cancellationToken = cancellationToken;
+            systems = database.GetCollection<Elite.System>("systems");
+            thread = new Thread(HandleEvents);
+            thread.Start();
+        }
+
+
+        public void Dispose() {
+            GC.SuppressFinalize(this);
+            buffer.Complete();
+            thread.Join();
+            database.Dispose();
+        }
+
+        private void HandleEvents() {
+            log.LogTrace("Starting LiteDbSystemStore event handler");
+            foreach (var dbEvent in buffer.ReceiveAllAsync(cancellationToken).ToEnumerable()) {
+                var eventId = Interlocked.Increment(ref eventsSeen);
+                log.LogTrace("executing event {EventId}", eventId);
+                dbEvent(database, systems, eventId);
+            }
+        }
+
+        public async Task DoAsync(DbEvent dbEvent, CancellationToken cancellationToken = default) {
+            await DoAsync<object>(
+                (db, systems, eventId) => {
+                    dbEvent(db, systems, eventId);
+                    return null;
+                },
+                cancellationToken
+            );
+        }
+
+        public async Task<TResult> DoAsync<TResult>(Func<LiteDatabase, ILiteCollection<Elite.System>, ulong, TResult> dbEvent,
+            CancellationToken cancellationToken = default) {
+            var linked = CancellationTokenSource.CreateLinkedTokenSource(this.cancellationToken, cancellationToken);
+            var oneshot = new TaskCompletionSource<TResult>();
+
+            void Wrapped(LiteDatabase db, ILiteCollection<Elite.System> systems, ulong eventId) {
+                oneshot.SetResult(dbEvent(db, systems, eventId));
+            }
+
+            await buffer.SendAsync(Wrapped, linked.Token);
+            return await oneshot.Task;
+        }
     }
 }

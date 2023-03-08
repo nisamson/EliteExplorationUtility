@@ -1,22 +1,32 @@
-﻿using System.Collections;
-using System.Collections.Immutable;
+﻿// EliteExplorationUtility - EEU - Systems.cs
+// Copyright (C) 2023 Nick Samson
+// 
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+// 
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+// 
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using EEU.Utils;
-using EEU.Utils.Init;
 using EFCore.BulkExtensions;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
-using NetTopologySuite.Utilities;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
 using Nullable.Extensions;
-using Assert = EEU.Utils.Assert;
 
 namespace EEU.Model;
 
@@ -142,10 +152,6 @@ public class System : IUpsertHandler {
         Updated = updated;
     }
 
-    public bool IsEligible() {
-        return Bodies.Any(b => b.IsEligibleBody()) || Population > 0;
-    }
-
     [JsonProperty(Required = Required.Always)]
     public ulong Id64 { get; set; }
 
@@ -188,6 +194,10 @@ public class System : IUpsertHandler {
     public void GatherChildEntities(TypeEntityMapping tem) {
         tem.AddAllEntities(Bodies.Where(b => b.IsEligibleBody()));
     }
+
+    public bool IsEligible() {
+        return Bodies.Any(b => b.IsEligibleBody()) || Population > 0;
+    }
 }
 
 [Owned]
@@ -209,14 +219,6 @@ public class Body : IUpsertHandler {
         Type = type;
         Name = name;
         LastUpdated = lastUpdated;
-    }
-
-    public bool IsEligibleBody() {
-        return Type == "Planet" && IsLandable;
-    }
-
-    public bool ShouldPersist() {
-        return Type is "Planet" or "Star";
     }
 
     [JsonIgnore] public ulong SystemId64 { get; set; }
@@ -363,6 +365,14 @@ public class Body : IUpsertHandler {
         SolidComposition.Let(tem.AddEntity);
         Materials.Let(tem.AddEntity);
     }
+
+    public bool IsEligibleBody() {
+        return Type == "Planet" && IsLandable;
+    }
+
+    public bool ShouldPersist() {
+        return Type is "Planet" or "Star";
+    }
 }
 
 [JsonObject(NamingStrategyType = typeof(CamelCaseNamingStrategy))]
@@ -452,21 +462,6 @@ public class Genus : IComparable<Genus>, IUpsertHandler {
 
     [Column(TypeName = "nvarchar(250)")] public string Name { get; set; }
 
-    private class Converter : JsonConverter<Genus> {
-        public override void WriteJson(JsonWriter writer, Genus? value, JsonSerializer serializer) {
-            serializer.Serialize(writer, value?.Name);
-        }
-
-        public override Genus? ReadJson(JsonReader reader,
-            Type objectType,
-            Genus? existingValue,
-            bool hasExistingValue,
-            JsonSerializer serializer) {
-            var value = serializer.Deserialize<string>(reader);
-            return value.Bind(s => new Genus(s));
-        }
-    }
-
     public int CompareTo(Genus? other) {
         if (ReferenceEquals(this, other)) {
             return 0;
@@ -486,6 +481,21 @@ public class Genus : IComparable<Genus>, IUpsertHandler {
     public void PrepareForUpsert() { }
 
     public void GatherChildEntities(TypeEntityMapping tem) { }
+
+    private class Converter : JsonConverter<Genus> {
+        public override void WriteJson(JsonWriter writer, Genus? value, JsonSerializer serializer) {
+            serializer.Serialize(writer, value?.Name);
+        }
+
+        public override Genus? ReadJson(JsonReader reader,
+            Type objectType,
+            Genus? existingValue,
+            bool hasExistingValue,
+            JsonSerializer serializer) {
+            var value = serializer.Deserialize<string>(reader);
+            return value.Bind(s => new Genus(s));
+        }
+    }
 }
 
 public class Materials : IUpsertHandler {
@@ -601,6 +611,20 @@ public class Parent : IUpsertHandler {
         Ring,
     }
 
+    [ForeignKey("Id64")] [JsonIgnore] public ulong BodyId64 { get; set; }
+
+    [JsonIgnore] public Body Body { get; set; } = null!;
+
+    public ulong Local { get; set; }
+
+    public Type Kind { get; set; }
+    public void HandleUpsertChildren(EEUContext ctx, BulkConfig cfg) { }
+    public async Task HandleUpsertChildrenAsync(EEUContext ctx, BulkConfig config) { }
+
+    public void PrepareForUpsert() { }
+
+    public void GatherChildEntities(TypeEntityMapping tem) { }
+
     public bool IsEligible() {
         return Kind == Type.Star;
     }
@@ -639,20 +663,6 @@ public class Parent : IUpsertHandler {
             return p;
         }
     }
-
-    [ForeignKey("Id64")] [JsonIgnore] public ulong BodyId64 { get; set; }
-
-    [JsonIgnore] public Body Body { get; set; } = null!;
-
-    public ulong Local { get; set; }
-
-    public Type Kind { get; set; }
-    public void HandleUpsertChildren(EEUContext ctx, BulkConfig cfg) { }
-    public async Task HandleUpsertChildrenAsync(EEUContext ctx, BulkConfig config) { }
-
-    public void PrepareForUpsert() { }
-
-    public void GatherChildEntities(TypeEntityMapping tem) { }
 }
 
 public static class TypeSupport {
@@ -668,20 +678,6 @@ public static class TypeSupport {
 }
 
 internal class PointConverter : JsonConverter<Point> {
-    [JsonObject(NamingStrategyType = typeof(CamelCaseNamingStrategy), ItemRequired = Required.Always)]
-    internal class RawCoords {
-        [JsonConstructor]
-        public RawCoords(double x, double y, double z) {
-            X = x;
-            Y = y;
-            Z = z;
-        }
-
-        public double X { get; init; }
-        public double Y { get; init; }
-        public double Z { get; init; }
-    }
-
     public override void WriteJson(JsonWriter writer, Point? value, JsonSerializer serializer) {
         if (value is null) {
             writer.WriteNull();
@@ -715,6 +711,20 @@ internal class PointConverter : JsonConverter<Point> {
         c.Y = rc.Y;
         c.Z = rc.Z;
         return c;
+    }
+
+    [JsonObject(NamingStrategyType = typeof(CamelCaseNamingStrategy), ItemRequired = Required.Always)]
+    internal class RawCoords {
+        [JsonConstructor]
+        public RawCoords(double x, double y, double z) {
+            X = x;
+            Y = y;
+            Z = z;
+        }
+
+        public double X { get; init; }
+        public double Y { get; init; }
+        public double Z { get; init; }
     }
 }
 

@@ -1,17 +1,29 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
+﻿// EliteExplorationUtility - EEU - Biology.cs
+// Copyright (C) 2023 Nick Samson
+// 
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+// 
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+// 
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Globalization;
 using CsvHelper;
 using CsvHelper.Configuration;
-using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
-using Nullable.Extensions;
-using System.IO;
 using CsvHelper.Configuration.Attributes;
 using EEU.Utils;
-using EFCore.BulkExtensions;
 using EEU.Utils.Conversions;
+using EFCore.BulkExtensions;
 using Microsoft.Data.SqlClient;
-using Convert = EEU.Utils.Conversions.Convert;
+using Microsoft.EntityFrameworkCore;
 
 namespace EEU.Model.Biology;
 
@@ -23,6 +35,53 @@ public class Biology : IUpsertHandler, IEquatable<Biology>, IComparable<Biology>
     [Column(TypeName = "nvarchar(100)")] public string Species { get; set; }
 
     public ulong SystemId64 { get; set; }
+
+    public int CompareTo(Biology? other) {
+        if (ReferenceEquals(this, other)) {
+            return 0;
+        }
+
+        if (ReferenceEquals(null, other)) {
+            return 1;
+        }
+
+        var bodyNameComparison = string.Compare(BodyName, other.BodyName, StringComparison.Ordinal);
+        if (bodyNameComparison != 0) {
+            return bodyNameComparison;
+        }
+
+        var genusComparison = string.Compare(Genus, other.Genus, StringComparison.Ordinal);
+        if (genusComparison != 0) {
+            return genusComparison;
+        }
+
+        var speciesComparison = string.Compare(Species, other.Species, StringComparison.Ordinal);
+        if (speciesComparison != 0) {
+            return speciesComparison;
+        }
+
+        return SystemId64.CompareTo(other.SystemId64);
+    }
+
+    public bool Equals(Biology? other) {
+        if (ReferenceEquals(null, other)) {
+            return false;
+        }
+
+        if (ReferenceEquals(this, other)) {
+            return true;
+        }
+
+        return SystemId64 == other.SystemId64 && BodyName == other.BodyName && Genus == other.Genus && Species == other.Species;
+    }
+
+    public void HandleUpsertChildren(EEUContext ctx, BulkConfig config) { }
+
+    public async Task HandleUpsertChildrenAsync(EEUContext ctx, BulkConfig config) { }
+
+    public void PrepareForUpsert() { }
+
+    public void GatherChildEntities(TypeEntityMapping tem) { }
 
     private static Biology? FromRaw(Raw r) {
         if (r.Body.IsNullOrEmpty()) {
@@ -37,13 +96,6 @@ public class Biology : IUpsertHandler, IEquatable<Biology>, IComparable<Biology>
             Genus = parts[0].ToLower(),
             Species = parts[1].ToLower(),
         };
-    }
-
-    private class Raw {
-        public string Id64 { get; set; }
-
-        public string? Body { get; set; }
-        public string Name { get; set; }
     }
 
     public static IEnumerable<Biology> FromCsv(CsvReader rd) {
@@ -77,26 +129,6 @@ public class Biology : IUpsertHandler, IEquatable<Biology>, IComparable<Biology>
         }
     }
 
-    public void HandleUpsertChildren(EEUContext ctx, BulkConfig config) { }
-
-    public async Task HandleUpsertChildrenAsync(EEUContext ctx, BulkConfig config) { }
-
-    public void PrepareForUpsert() { }
-
-    public void GatherChildEntities(TypeEntityMapping tem) { }
-
-    public bool Equals(Biology? other) {
-        if (ReferenceEquals(null, other)) {
-            return false;
-        }
-
-        if (ReferenceEquals(this, other)) {
-            return true;
-        }
-
-        return SystemId64 == other.SystemId64 && BodyName == other.BodyName && Genus == other.Genus && Species == other.Species;
-    }
-
     public override bool Equals(object? obj) {
         if (ReferenceEquals(null, obj)) {
             return false;
@@ -117,31 +149,11 @@ public class Biology : IUpsertHandler, IEquatable<Biology>, IComparable<Biology>
         return HashCode.Combine(SystemId64, BodyName, Genus, Species);
     }
 
-    public int CompareTo(Biology? other) {
-        if (ReferenceEquals(this, other)) {
-            return 0;
-        }
+    private class Raw {
+        public string Id64 { get; set; }
 
-        if (ReferenceEquals(null, other)) {
-            return 1;
-        }
-
-        var bodyNameComparison = string.Compare(BodyName, other.BodyName, StringComparison.Ordinal);
-        if (bodyNameComparison != 0) {
-            return bodyNameComparison;
-        }
-
-        var genusComparison = string.Compare(Genus, other.Genus, StringComparison.Ordinal);
-        if (genusComparison != 0) {
-            return genusComparison;
-        }
-
-        var speciesComparison = string.Compare(Species, other.Species, StringComparison.Ordinal);
-        if (speciesComparison != 0) {
-            return speciesComparison;
-        }
-
-        return SystemId64.CompareTo(other.SystemId64);
+        public string? Body { get; set; }
+        public string Name { get; set; }
     }
 }
 
@@ -153,21 +165,6 @@ public class SpeciesInformation {
     public long Value { get; set; }
 
     public long ClonalRange { get; set; }
-
-    private class LimitedSpeciesInformation {
-        [Name("Species")] public string Species { get; set; }
-        [Name("Value")] public long Value { get; set; }
-
-        public SpeciesInformation ToSpeciesInformation() {
-            var parts = Species.Split(" ", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-            return new SpeciesInformation {
-                Genus = parts[0].ToLower(),
-                Species = parts[1].ToLower(),
-                Value = Value,
-                ClonalRange = 0,
-            };
-        }
-    }
 
     public static IEnumerable<SpeciesInformation> FromLimitedCsv(CsvReader rd) {
         return rd.GetRecords<LimitedSpeciesInformation>().Select(x => x.ToSpeciesInformation());
@@ -202,5 +199,20 @@ public class SpeciesInformation {
         }
 
         tx.Commit();
+    }
+
+    private class LimitedSpeciesInformation {
+        [Name("Species")] public string Species { get; set; }
+        [Name("Value")] public long Value { get; set; }
+
+        public SpeciesInformation ToSpeciesInformation() {
+            var parts = Species.Split(" ", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            return new SpeciesInformation {
+                Genus = parts[0].ToLower(),
+                Species = parts[1].ToLower(),
+                Value = Value,
+                ClonalRange = 0,
+            };
+        }
     }
 }

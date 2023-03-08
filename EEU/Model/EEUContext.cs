@@ -1,22 +1,28 @@
-﻿// ReSharper disable InconsistentNaming
+﻿// EliteExplorationUtility - EEU - EEUContext.cs
+// Copyright (C) 2023 Nick Samson
+// 
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+// 
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+// 
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-using System.Data;
-using System.Data.SqlClient;
-using System.Diagnostics;
-using System.Diagnostics.Contracts;
-using System.Runtime.InteropServices;
-using System.Security.Cryptography;
-using System.Text;
+// ReSharper disable InconsistentNaming
+
+using EEU.Model.Biology;
 using EEU.Utils;
-using EEU.Utils.Init;
 using EFCore.BulkExtensions;
 using Microsoft.Data.SqlClient;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
-using SqlParameter = Microsoft.Data.SqlClient.SqlParameter;
 
 namespace EEU.Model;
 
@@ -25,19 +31,6 @@ public class EEUContext : DbContext {
         "Server=localhost;Database=master;Trusted_Connection=True;Trust Server Certificate=true;Command Timeout=0;";
 
     public EEUContext(DbContextOptions<EEUContext> options) : base(options) { }
-
-    public class DesignFactory : IDesignTimeDbContextFactory<EEUContext> {
-        public EEUContext CreateDbContext(string[] args) {
-            var optionsBuilder = new DbContextOptionsBuilder<EEUContext>();
-            optionsBuilder.UseLoggerFactory(new LoggerFactory())
-                // .EnableSensitiveDataLogging()
-                // .EnableDetailedErrors()
-                // .LogTo(Console.WriteLine)
-                .UseSqlServer(DefaultConnString);
-
-            return new EEUContext(optionsBuilder.Options);
-        }
-    }
 
     public EEUContext() { }
     // migrationBuilder.Sql(@"SELECT CreateSpatialIndex('Systems', 'Coords');");
@@ -68,7 +61,7 @@ public class EEUContext : DbContext {
     public DbSet<SolidComposition> SolidCompositions { get; set; }
     public DbSet<Materials> Materials { get; set; }
     public DbSet<Biology.Biology> Biology { get; set; }
-    public DbSet<Biology.SpeciesInformation> Species { get; set; }
+    public DbSet<SpeciesInformation> Species { get; set; }
     public DbSet<OneHotGenuses> OneHotGenera { get; set; }
     public DbSet<CodexEntry> CodexEntries { get; set; }
 
@@ -216,5 +209,18 @@ public class EEUContext : DbContext {
         }
 
         tx.Commit();
+    }
+
+    public class DesignFactory : IDesignTimeDbContextFactory<EEUContext> {
+        public EEUContext CreateDbContext(string[] args) {
+            var optionsBuilder = new DbContextOptionsBuilder<EEUContext>();
+            optionsBuilder.UseLoggerFactory(new LoggerFactory())
+                // .EnableSensitiveDataLogging()
+                // .EnableDetailedErrors()
+                // .LogTo(Console.WriteLine)
+                .UseSqlServer(DefaultConnString);
+
+            return new EEUContext(optionsBuilder.Options);
+        }
     }
 }

@@ -1,7 +1,21 @@
-﻿using System.Runtime.Serialization;
+﻿// EliteExplorationUtility - EEU.Learn - BodyData.cs
+// Copyright (C) 2023 Nick Samson
+// 
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+// 
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+// 
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+using System.Runtime.Serialization;
 using Microsoft.ML;
-using Microsoft.ML.Data;
-using Microsoft.ML.Trainers.FastTree;
 using Microsoft.ML.Transforms;
 using Microsoft.ML.Transforms.Text;
 
@@ -179,10 +193,6 @@ public record BodyData {
         Value = value;
     }
 
-    public static string[] FeatureColumnNames() {
-        return NumericColumns.Select(x => x.OutputColumnName).ToArray();
-    }
-
     public string SubType { get; set; }
 
     public double Gravity { get; set; }
@@ -284,6 +294,10 @@ public record BodyData {
     public string Genera { get; set; }
 
     public long Value { get; set; }
+
+    public static string[] FeatureColumnNames() {
+        return NumericColumns.Select(x => x.OutputColumnName).ToArray();
+    }
 
     public static IEstimator<ITransformer> CreateUnknownGeneraEstimator(MLContext context) {
         var estimator = CreateBaseEstimator(context);
@@ -424,9 +438,9 @@ public record BodyData {
                 Console.WriteLine($"{name}: {x.RSquared.Mean}");
             }
 
-            var path = Path.GetFullPath($"valuePredictionModel.zip");
+            var path = Path.GetFullPath("valuePredictionModel.zip");
             context.Model.Save(model, view.Schema, path);
-            var path2 = Path.GetFullPath($"valuePredictionModelWithGenera.zip");
+            var path2 = Path.GetFullPath("valuePredictionModelWithGenera.zip");
             context.Model.Save(withGeneraModel, view.Schema, path2);
             Console.WriteLine($"wrote model to {path}");
         }

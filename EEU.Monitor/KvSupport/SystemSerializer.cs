@@ -1,21 +1,36 @@
-﻿using System.Text;
+﻿// EliteExplorationUtility - EEU.Monitor - SystemSerializer.cs
+// Copyright (C) 2023 Nick Samson
+// 
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+// 
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+// 
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using FASTER.core;
 using Microsoft.Extensions.Logging;
-using InvalidOperationException = System.InvalidOperationException;
 
 namespace EEU.Monitor.KvSupport;
 
 public class SystemSerializer : BinaryObjectSerializer<Elite.System> {
-    private readonly ILogger? log;
-
     private static readonly JsonSerializerOptions JsonSerializerOptions = new() {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
     };
 
-    public SystemSerializer(ILogger? log = null) : base() {
+    private readonly ILogger? log;
+
+    public SystemSerializer(ILogger? log = null) {
         this.log = log;
     }
 

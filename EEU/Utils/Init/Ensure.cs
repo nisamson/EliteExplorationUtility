@@ -1,8 +1,22 @@
-﻿using System.Diagnostics;
+﻿// EliteExplorationUtility - EEU - Ensure.cs
+// Copyright (C) 2023 Nick Samson
+// 
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+// 
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+// 
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Text.RegularExpressions;
 using Microsoft.Extensions.DependencyModel;
-using Nullable.Extensions;
 
 #pragma warning disable CS8604
 #nullable disable
@@ -14,8 +28,9 @@ public class Ensure {
     private static string? CheckLoadable(string package, string library) {
     #pragma warning restore CS8632
         var runtimeLibrary = DependencyContext.Default?.RuntimeLibraries.FirstOrDefault(l => l.Name == package);
-        if (runtimeLibrary == null)
+        if (runtimeLibrary == null) {
             return null;
+        }
 
         string sharedLibraryExtension;
         string pathVariableName;
@@ -62,7 +77,7 @@ public class Ensure {
             .FirstOrDefault();
 
         string assetFullPath = null;
-        if (assetPath != default) {
+        if (assetPath != default((string Package, string Asset))) {
             string assetDirectory = null;
             if (File.Exists(Path.Combine(AppContext.BaseDirectory, assetPath.Asset))) {
                 // NB: Framework-dependent deployments copy assets to the application base directory
@@ -100,7 +115,7 @@ public class Ensure {
 
         return null;
     }
-    
+
     public static void Loadable(string package, string library) {
         var res = CheckLoadable(package, library);
         if (res is null) {
